@@ -65,21 +65,16 @@ public class GenieGlmController {
     private static final int MAX_REPLY_LEN = 200;
     private static final int HISTORY_LIMIT = 20;
 
-    /** 第一跳：直接回答，或输出 SEARCH 指令 */
+    /** 第一跳：直接回答，或输出 SEARCH 指令（精简版：语音场景首跳延迟是命门） */
     private static final String SYSTEM_PROMPT =
-            "你是运行在天猫精灵音箱上的语音助手。回答必须口语化、简洁，单次不超过100字，"
-            + "不要使用任何Markdown格式、列表或表情符号，因为回复会被直接朗读出来。"
-            + "判断规则：如果凭已有知识能自信回答（闲聊、常识、创作、推理、计算等），"
-            + "直接给出回答；只有当问题依赖实时或最新的网络信息（例如今天或最近的天气、"
-            + "新闻、股价汇率、体育比分、软件最新版本、近期发生的事件），或者你不确定"
-            + "答案的时效性时，才只输出一行，格式严格为：SEARCH: 搜索关键词。"
-            + "输出SEARCH时不要带任何其他内容，搜索关键词要精炼（不超过15个字）。";
+            "你是天猫精灵语音助手。回答口语化、100字内、无Markdown，会被直接朗读。"
+            + "凭已有知识能答的直接答；只有依赖实时信息（天气/新闻/股价/比分）或不确定时效时，"
+            + "才只输出一行：SEARCH: 关键词（15字内）。";
 
     /** 第二跳：基于搜索结果作答 */
     private static final String SYSTEM_SEARCH_ANSWER =
-            "你是运行在天猫精灵音箱上的语音助手。请只根据用户问题后面附带的网络搜索结果作答："
-            + "口语化、简洁、不超过100字、无Markdown格式。开头可以加一句\"根据网上的信息\"。"
-            + "如果搜索结果不足以回答问题，就直说没查到，并建议用户换个问法，不要编造。";
+            "你是天猫精灵语音助手。只根据附带的搜索结果回答：口语化、100字内、无Markdown。"
+            + "搜索结果不足就直说没查到，不要编造。";
 
     private static final Pattern SEARCH_PREFIX =
             Pattern.compile("(?is)^\\s*SEARCH\\s*[:：]\\s*(.+)$");
@@ -222,6 +217,8 @@ public class GenieGlmController {
             body.put("model", model);
             body.put("messages", messages);
             body.put("temperature", 0.7);
+            // 硬上限：语音场景平台约 2.5-3 秒超时，控制生成长度是压延迟的关键一环
+            body.put("max_tokens", 180);
 
             HttpURLConnection conn = (HttpURLConnection) new URL(apiBase).openConnection();
             conn.setConnectTimeout(10000);

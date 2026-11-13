@@ -59,6 +59,9 @@ public class GenieGlmController {
 
     /** 意图里"任意文本"参数名，需与平台配置一致 */
     private static final String SLOT_NAME = "anyText";
+
+    /** 技能调用词（utterance 回退时用于剥掉前缀），可用环境变量 WAKE_WORD 覆盖 */
+    private static final String WAKE_WORD = env("WAKE_WORD", "智多星");
     private static final int MAX_REPLY_LEN = 200;
     private static final int HISTORY_LIMIT = 20;
 
@@ -104,6 +107,10 @@ public class GenieGlmController {
                     .map(s -> s.getOriginalValue())
                     .findFirst()
                     .orElse("");
+            if (userText == null || userText.isEmpty()) {
+                // 平台无"任意文本"参数实体时，回退用原始语句（剥掉调用词前缀）
+                userText = extractUtterance(json);
+            }
             if (userText == null || userText.isEmpty()) {
                 result.setReply("我在听，请说完整一点。");
             } else {
@@ -317,6 +324,23 @@ public class GenieGlmController {
     private static String env(String name, String def) {
         String v = System.getenv(name);
         return (v == null || v.isEmpty()) ? def : v;
+    }
+
+    /** 从原始请求 JSON 里取 utterance 字段，剥掉调用词与开头标点 */
+    private static String extractUtterance(String json) {
+        try {
+            String u = JSON.parseObject(json).getString("utterance");
+            if (u == null) {
+                return "";
+            }
+            u = u.trim();
+            if (u.startsWith(WAKE_WORD)) {
+                u = u.substring(WAKE_WORD.length());
+            }
+            return u.replaceFirst("^[，。,\\.\\s！？!?]+", "").trim();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     static JSONObject msg(String role, String content) {
